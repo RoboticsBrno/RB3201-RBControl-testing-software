@@ -2,9 +2,10 @@
 
 using namespace rb;
 
-// CHANGE ME IF USING DIFFERENT PIN
-#define SERVO_PIN GPIO_NUM_32
-#define SERVO_COUNT 3
+// Config:
+constexpr auto SERVO_PIN = GPIO_NUM_32; // CHANGE ME IF USING DIFFERENT PIN
+constexpr auto SERVO_COUNT  = 3;
+constexpr auto SERVO_POS = 120.0; // degrees
 
 /********** README - HOW TO USE **********
  *
@@ -27,7 +28,9 @@ using namespace rb;
  *  6) Go to 2) until all servos are set-up
  *  7) Once complete, this program lights up all the servo LEDs (Y,G,B) at once.
  *  8) Connect all the servos to the ESP at once
- *  9) See if the red error LED stops blinking. If not, check the serial output and fix
+ *  9) See if the red error LED stops blinking. If not, check the serial output and fix it.
+ *     The set-up is only successful if the red LED stops blinking. At that point, all
+ *     servos have correct IDs and they are at 120deg position.
  *
  */
 
@@ -80,7 +83,8 @@ static bool setupServo() {
         printf(" OK\n\n");
     }
 
-    servos.set(gServoId, 120_deg, 150);
+    servos.set(gServoId, Angle::deg(SERVO_POS + 0.1), 150);
+    servos.set(gServoId, Angle::deg(SERVO_POS), 150);
     return true;
 }
 
@@ -140,12 +144,16 @@ void setup() {
 
     printf("\nSetup complete!\n");
     while(1) {
-        bool gotNaN = false;
+        bool error = false;
         for(int i = 0; i < SERVO_COUNT; ++i) {
             auto p = servos.pos(i);
-            if(p.isNaN()) {
-                gotNaN = true;
+            if(p.isNaN() || fabs(p.deg() - 120.0) > 1.5) {
+                error = true;
                 printf("%d: %.2f <------- ERROR!\n", i, p.deg());
+                if(!p.isNaN()) {
+                    servos.set(i, Angle::deg(SERVO_POS + 0.1), 150);
+                    servos.set(i, Angle::deg(SERVO_POS), 150);
+                }
             } else {
                 printf("%d: %.2f OK!\n", i, p.deg());
             }
@@ -153,7 +161,7 @@ void setup() {
         printf("\n");
 
         gMutex.lock();
-        setErrorStateLocked(gotNaN);
+        setErrorStateLocked(error);
         gMutex.unlock();
 
         vTaskDelay(MS(1000));
