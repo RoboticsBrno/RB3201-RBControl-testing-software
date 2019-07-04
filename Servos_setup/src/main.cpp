@@ -72,9 +72,21 @@ static bool setupServo() {
 
     auto& servos = Manager::get().servoBus();
 
-    servos.setId(gServoId);
+    const uint8_t first_id = servos.getId();
+    for(int i = 0; i < 5; ++i) {
+        const uint8_t cur_id = servos.getId();
+        if(first_id == 0xFF || cur_id != first_id) {
+            setErrorStateLocked(true);
+            printf("\nServo #%d id responses are not consistent, none or more than one servo connected? <--- ERROR!!!\n", gServoId);
+            return true;
+        }
+    }
 
-    auto pos = servos.pos(gServoId);
+    if(first_id != gServoId) {
+        servos.setId(gServoId);
+    }
+
+    const auto pos = servos.pos(gServoId);
     printf("\nSet servo ID #%d, returned pos: %f", gServoId, pos.deg());
     setErrorStateLocked(pos.isNaN());
     if(pos.isNaN()) {
